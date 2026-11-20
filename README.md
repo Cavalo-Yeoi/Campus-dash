@@ -1,8 +1,6 @@
 # 悬赏派
 
-高级分层架构的并发与一致性工程样本：发单人悬赏（资金托管）→ N 人同时抢、恰好一个成功
-→ 限时未确认自动流转 → 送达确认后结算给跑腿与平台。业务链路短，但每个环节都踩在硬骨头上：
-抢单正确性可验证（超卖就是错）、资金正确性可验证（借贷不平就是错）。
+悬赏派是一款面向校园代取、代买、代送等场景的任务悬赏与抢单平台，围绕任务发布、并发抢单、超时流转、履约确认、资金托管、结算退款及仲裁等业务环节，构建完整的核心业务链路。项目基于 Java 21、Spring Boot、MySQL、Redis、RocketMQ 等技术，重点解决高并发抢单场景下的资源竞争、任务状态可靠流转，以及资金结算过程中的幂等性与一致性问题。
 
 
 ## 项目结构
@@ -17,9 +15,8 @@ campus-dash/
 │   ├── dash-worker/           # 后台任务：超时流转/自动结算/资金事件消费者、兜底扫描、对账 job
 │   ├── dash-bootstrap/        # 应用装配 + 54 个集成测试
 │   ├── dash-bench/            # 压测工具
-│   ├── dash-shared/           # ErrorCode / Money（long 存分）/ Result / 雪花 ID
-│   ├── docker/                # Docker Compose 编排
-│   └── docs/                  # 设计文档、分期决策、踩坑记录
+│   ├── dash-shared/           # ErrorCode / Money/ Result / 雪花 ID
+│   └── docker/                # Docker Compose 编排
 └── campus-dash-frontend/      # 前端项目（React + TypeScript + Vite）
     ├── src/                   # 源代码
     │   ├── components/        # 通用组件
@@ -45,7 +42,7 @@ campus-dash/
 
 ### 1. 启动后端
 
-启动前，在当前终端设置 `SPRING_DATASOURCE_PASSWORD`；后端、worker、测试与 MySQL Compose 使用同一环境变量，无明文默认口令。可通过 `read -rs SPRING_DATASOURCE_PASSWORD` 静默输入并执行 `export SPRING_DATASOURCE_PASSWORD`，或从仓库外受控环境文件加载。使用 JWT 模式时另需设置至少 32 字节的 `DASH_JWT_SECRET`。不要提交真实 `.env`，不要将展开凭证的 `docker compose config` 输出加入报告；检查配置使用 `docker compose config --quiet`。具体步骤见 [后端凭证配置](campus-dash-backend/docs/凭证配置与发布脱敏.md)。
+启动前，在当前终端设置 `SPRING_DATASOURCE_PASSWORD`；后端、worker、测试与 MySQL Compose 使用同一环境变量，无明文默认口令。可通过 `read -rs SPRING_DATASOURCE_PASSWORD` 静默输入并执行 `export SPRING_DATASOURCE_PASSWORD`，或从仓库外受控环境文件加载。使用 JWT 模式时另需设置至少 32 字节的 `DASH_JWT_SECRET`。不要提交真实 `.env`，不要将展开凭证的 `docker compose config` 输出加入报告；检查配置使用 `docker compose config --quiet`。
 
 
 ```bash
@@ -82,7 +79,7 @@ npm run dev
 - 跑腿 2001、2002
 - 仲裁员 9001
 
-### API 快速体验（不走前端）
+### API 
 
 ```bash
 TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
@@ -99,11 +96,11 @@ curl -s -X POST localhost:8080/api/errands -H "Authorization: Bearer $TOKEN" \
 ### 压测与数据治理
 
 ```bash
-# S1 尖峰：2000 并发抢 1 名额（应用层与数据库侧双验证）
+# S1 尖峰：2000 并发抢 1 名额
 # S4 资金：500 任务并发结算 / 200 并发结算同一任务（SettleConcurrencyIT）
 cd campus-dash-backend && mvn test -Dtest=SettleConcurrencyIT
 
-# 按轮次校验与清理（数据默认保留最近 10 轮，便于改动前后对比）
+# 按轮次校验与清理
 RUN_ID=<runId> bash bench/scripts/verify_run.sql   # 抢单侧五条不变式
 bash bench/scripts/verify_fund.sql                  # 资金侧五条不变式
 bash bench/scripts/cleanup.sh --keep-last 10
@@ -158,22 +155,7 @@ escrow 状态 CAS + errand 状态 CAS + wallet_ledger.biz_no 唯一索引。
 - **WebSocket** 实时推送
 - **7 个页面**：任务广场、发布任务、我的任务、钱包、信用分、消息、详情
 
-## 学习路径
 
-建议按以下顺序学习：
-
-1. **后端架构**：阅读 `campus-dash-backend/docs/架构设计与技术选型.md`
-2. **领域模型**：从 `campus-dash-backend/dash-domain` 开始，理解业务规则
-3. **并发控制**：重点看抢单链路（Redis Lua + DB CAS）
-4. **资金链路**：理解复式记账和对账机制
-5. **前端交互**：从 `campus-dash-frontend/src/pages/Square.tsx` 开始
-
-## 文档
-
-- [后端架构设计](campus-dash-backend/docs/架构设计与技术选型.md)
-- [设计演进记录](campus-dash-backend/docs/设计演进记录.md)（八期进度 + 18 条踩坑）
-- [压测方案](campus-dash-backend/docs/压测方案与容量评估.md)
-- 面试题库：92 题 + 指标深挖，详见在线文档
 
 ## 技术栈
 
@@ -193,16 +175,12 @@ escrow 状态 CAS + errand 状态 CAS + wallet_ledger.biz_no 唯一索引。
 - WebSocket API
 
 ## 项目规模
-
 - **后端代码**：8 个 Maven 模块，93 个测试用例
 - **前端代码**：7 个页面，3 个通用组件
-- **教程**：12 篇 32 章完整教程，覆盖架构设计到压测调优
-- **面试题库**：92 题 + 8 道指标深挖
 
 ## 已知边界（诚实清单）
 
 - 单机默认稳定线到 400 并发：S2 60s 档位约 6455 QPS、P99 151ms；默认 800 并发有 146 个 IOException，调参后 800 并发 0 错误但 P99 472ms
-- 流转准时率 P99 仍为 `[待补充]`：需要自然到期时间轴重测
 - 压测环境无隔离（应用/中间件/发压端同机），数字仅作同机基线
 - 前端"模拟 N 人同时抢"用临时身份演示，临时身份无钱包账户，别用它走完生命周期
 - ES/Canal 已在 P4 摘除（校园场景不需要），一致性兜底是校验 job 而非 binlog 秒级纠正
