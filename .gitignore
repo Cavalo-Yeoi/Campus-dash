@@ -1,0 +1,15 @@
+
+# 私有凭据只通过环境或仓库外受控文件注入
+.env
+.env.*
+!.env.example
+
+# 本机配置、备份、日志和进程状态
+.local/
+/local.ps1
+/LOCAL_SETUP.md
+/RUN_LOCAL.md
+/UPDATE_REPORT_2026-11-17.md
+/docs/superpowers/
+/campus-dash-backend/dash-bench.zip
+/campus-dash-backend/docs/
